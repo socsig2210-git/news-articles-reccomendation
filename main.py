@@ -26,37 +26,49 @@ p_matrix = np.array([[0.8, 0.2, 0.2, 0.2], # p0
 people = np.zeros(T, dtype=np.int64)
 
 r_cumul = np.zeros(k)
+m_ui = np.zeros(k)
 visits = np.zeros(k, dtype=np.int64)
-# ucb = np.arange(k)
-ucb = np.flip(np.arange(start=2, stop=k+2, dtype=np.float64))
+ucb = np.zeros(k)
+# ucb = np.flip(np.arange(start=2, stop=k+2, dtype=np.float64))
 
 # starting data
 for i in range(T):
     person_type = people[i]
     
-    # if i < k:
-    #     site = i
-    #     continue
-    # else:
-    #     #TODO how do i calculate which site i use?
-    #     site = np.argmax(ucb)
-    site = np.argmax(ucb)
+    if i < k:
+        site = i
+        ind = i+1
+    else:
+        #TODO how do i calculate which site i use?
+        site = np.argmax(ucb)
+        ind = k
+    # site = np.argmax(ucb)
 
     p = p_matrix[site][person_type] # chooose i site
     choice = np.random.choice([1, 0], p=[p, 1-p])
     visits[site] += 1
     r_cumul[site] += choice
 
-    m_ui = r_cumul[site] / visits[site]
+    m_ui[site] = r_cumul[site] / visits[site]
 
     # TODO: all ucb should update after each visit
-    ucb[site] = m_ui + np.sqrt(2*np.log(i+1) / visits[site], dtype=np.float64)
+    # if i < k:
+    #     ind = i+1
+    # else: 
+    #     ind = k
+    
+    # update ucb array
+    for j in range(ind):
+        ucb[j] = m_ui[j] + np.sqrt(2*np.log(i+1) / visits[j], dtype=np.float64)
+
 
 # Print actual rewards
 # prop = np.sum(p_matrix, axis=1)[0] 
 for i in range(k):
     print(f'ucb for site no. {i+1}: {ucb[i]}')
 
+for i in range(k):
+    print(f'm_ui for site no. {i+1}: {m_ui[i]}')
 
 
 # ucb algorithm for specified problem
