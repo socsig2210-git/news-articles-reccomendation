@@ -5,102 +5,85 @@ import pandas as pd
 import random
 
 # Data Initialisation
-k = 5     # number of articles
-T = 10000   # horizon (total visits) 
-U = 4     # no of user types
+k = 5      # number of articles
+T = 1000   # horizon (total visits) 
+U = 4      # no. of user types
 
-# propabilities for each site depending on person category
+# propabilities for each article depending on user category
 p_matrix = np.array([[0.8, 0.2, 0.2, 0.2], # p0
                     [0.6, 0.4, 0.4, 0.4], # p1
                     [0.5, 0.5, 0.8, 0.8], # p2
                     [0.4, 0.6, 0.6, 0.6], # p3
                     [0.2, 0.8, 0.8, 0.8]]) # p4
 
-# Shmeiwsi
-# px for P(choose article 0) = P(p0 | fem o 25)*P(fem o 25) + P(p0 | male o 25)*P(male o 25) + P(p0 | u 25)*P(u 25)
-# P(choose article 0) = 0.8*0.25 + 0.2*0.25 + 0.2*0.5 = 0.35
+users = np.random.randint(0,U,T)  # 0 -> mo25, 1 -> fo25, 2 -> mu25, 3-> fu25
+r_cumul = np.zeros((U,k))         # cumulative reward of articles based on user's type
+m_ui = np.zeros((U,k))            # mean reward of articles based on user's type
+horizon = np.zeros(U, dtype=np.int64)   # horizon for each user's type
+visits = np.zeros((U, k), dtype=np.int64)  # Total visits for each article from a specific user's type
+ucb = np.zeros((U,k))                      # UCB score of each article based on user's type
 
-# visits = np.zeros((T,3)) # visits of type [[botol visi, int person, int news site]]
+regret = np.zeros(T)
+regret_cumul = np.zeros(T)
+best_props = np.max(p_matrix, axis=0) # best propability from data based on user_type
+best_score = np.zeros(T)              # cumulative best article's propability
+ucb_score = np.zeros(T)               # cumulative ucb's algorithm propability
 
-# for only 1 type of person
-# people = np.zeros(T, dtype=np.int64)
-
-# 1 type
-
-# r_cumul = np.zeros(k)
-# m_ui = np.zeros(k)
-# visits = np.zeros(k, dtype=np.int64)
-# ucb = np.zeros(k)
-# ucb = np.flip(np.arange(start=2, stop=k+2, dtype=np.float64))
-
-# for i in range(T):
-#     person_type = people[i]
-    
-#     if i < k:
-#         site = i
-#         ind = i+1
-#     else:
-#         #TODO how do i calculate which site i use?
-#         site = np.argmax(ucb)
-#         ind = k
-
-#     p = p_matrix[site][person_type] # chooose i site
-#     choice = np.random.choice([1, 0], p=[p, 1-p])
-#     visits[site] += 1
-#     r_cumul[site] += choice
-
-#     m_ui[site] = r_cumul[site] / visits[site]
-
-#     # update ucb array
-#     for j in range(ind):
-#         ucb[j] = m_ui[j] + np.sqrt(2*np.log(i+1) / visits[j], dtype=np.float64)
-
-# U types
-
-# TODO: calculate regret during procedure
-
-people = np.random.randint(0,U,T) # 0 -> mo25, 1 -> fo25, 2 -> mu25, 3-> fu25
-r_cumul = np.zeros((U,k))
-m_ui = np.zeros((U,k))
-horizon = np.zeros(U, np.int64)
-visits = np.zeros((U, k), dtype=np.int64)
-ucb = np.zeros((U,k))
-
+# Algorithm implementation
 for i in range(T):
-    person_type = people[i]
+    user_type = users[i]
     
-    if horizon[person_type] < k:
-        site = horizon[person_type]
-        ind = site+1
+    # pick which article to visit 
+    if horizon[user_type] < k: # for 4 first pulls for each user's type, articles are selected sequentially
+        article = horizon[user_type]
+        ind = article+1 # index < k for 4 first pulls
     else:
-        #TODO how do i calculate which site i use?
-        site = np.argmax(ucb[person_type])
+        article = np.argmax(ucb[user_type]) # choose article with best ucb score, based on user's type
         ind = k
 
-    p = p_matrix[site][person_type] # chooose i site
-    choice = np.random.choice([1, 0], p=[p, 1-p])
-    horizon[person_type] += 1
-    visits[person_type][site] += 1
-    r_cumul[person_type][site] += choice
+    # action    
+    p = p_matrix[article][user_type] # get chosen article's propability
+    choice = np.random.choice([1, 0], p=[p, 1-p]) 
+    horizon[user_type] += 1
+    visits[user_type][article] += 1
+    r_cumul[user_type][article] += choice
 
-    m_ui[person_type][site] = r_cumul[person_type][site] / visits[person_type][site]
+    # calculate mean reward for specific article for this specific user's type
+    m_ui[user_type][article] = r_cumul[user_type][article] / visits[user_type][article]
 
-    # update ucb array
+    # update ucb arrays of specified user's type
     for j in range(ind):
-        ucb[person_type][j] = m_ui[person_type][j] + np.sqrt(2*np.log(horizon[person_type]) / visits[person_type][j], dtype=np.float64)
+        ucb[user_type][j] = m_ui[user_type][j] + np.sqrt(2*np.log(horizon[user_type]) / visits[user_type][j], dtype=np.float64)
+
+    # Regret phase
+    alg_score = p # algorithm score = propability of chosen site, based on user's type 
+    best = best_props[user_type]  # best score = best prop for specific user type
+
+    if i > 0: best_score[i] = best_score[i-1] + best # calculate cumulative best score
+    else: best_score[i] = best
+    if i > 0: ucb_score[i] = ucb_score[i-1] + alg_score # calculate cumulative algorithm score
+    else: ucb_score[i] = alg_score
+    regret_cumul[i] = (best_score[i] - ucb_score[i])
+    regret[i] = regret_cumul[i]/(i+1)
+
+# TODO: INCLUDE UP BOUNDS AT PLOTS 
+
+plt.title("UCB Regret") 
+plt.xlabel("Round T") 
+plt.ylabel("E[R]") 
+plt.plot(np.arange(1,T+1),regret) 
+plt.show()
 
 
-# Print actual rewards
-# prop = np.sum(p_matrix, axis=1)[0] 
+# print data
+# with open('output.txt', 'w+') as f:
+#     f.write('Total visits:\n')
+#     for i, visit in enumerate(horizon):
+#         f.write(f'Type {i}: {visit}\n')
 
-with open('output.txt', 'w+') as f:
-    f.write('Total visits:\n')
-    for i, visit in enumerate(horizon):
-        f.write(f'Type {i}: {visit}\n')
-
-    f.write('\nUCB\n')
-    for i in range(U):
-        f.write(f'#For type {i}:\n')
-        f.write(f'\nBest site for type {i} is site no. {np.argmax(ucb[i])}\n')
-        for j in range(k):
-            f.write(f'{j}: ucb: {ucb[i][j]}, m_ui: {m_ui[i][j]}, visits: {visits[i][j]}\n')
+#     f.write('\nUCB\n')
+#     for i in range(U):
+#         f.write(f'#For type {i}:\n')
+#         f.write(f'\nBest site for type {i} is site no. {np.argmax(ucb[i])}\n')
+#         for j in range(k):
+#             f.write(f'{j}: ucb: {ucb[i][j]}, m_ui: {m_ui[i][j]}, visits: {visits[i][j]}\n')
