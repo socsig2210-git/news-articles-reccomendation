@@ -6,7 +6,7 @@ import random
 
 # Data Initialisation
 k = 5      # number of articles
-T = 1000   # horizon (total visits) 
+T = 100000   # horizon (total visits) 
 U = 4      # no. of user types
 
 # propabilities for each article depending on user category
@@ -66,12 +66,26 @@ for i in range(T):
     regret_cumul[i] = (best_score[i] - ucb_score[i])
     regret[i] = regret_cumul[i]/(i+1)
 
+# calculate upper_bound constant
+upper_bound_constant = 0.0
+for i in range(U):
+    for j in range(k):
+        if p_matrix[j][i] < best_props[i]:
+            upper_bound_constant += 8*k/(best_props[i] - p_matrix[j][i])
+
+
+t_axis = np.arange(1,T+1)
+theoritical_upper_bound_cumulative = np.full(T, upper_bound_constant*np.log(T))
+theoritical_upper_bound = theoritical_upper_bound_cumulative / t_axis
+
 # TODO: INCLUDE UP BOUNDS AT PLOTS 
 
 plt.title("UCB Regret") 
 plt.xlabel("Round T") 
 plt.ylabel("E[R]") 
-plt.plot(np.arange(1,T+1),regret) 
+plt.ylim([0, 10])
+plt.plot(t_axis,regret, color='b', label='mean regret')
+plt.plot(t_axis,theoritical_upper_bound, color='r', label='upper bound')
 plt.show()
 
 
